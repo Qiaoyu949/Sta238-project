@@ -1,0 +1,218 @@
+---
+title: "STA238 Final Project"
+author: "Qiaoyu Wang & Zhanfei Gu"
+date: '2022-03-21'
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(latex2exp)
+```
+
+## Data cleaning
+
+```{r}
+# Import data 
+data <- read_csv("Life Expectancy Data.csv", show_col_types = FALSE)
+
+# Data cleaning
+# Remove missing value on variable Life expectancy, Total expenditure
+# Only keep the data for year 2014
+# Only keep the 5 variables in the final dataset
+
+data_clean <- data %>%
+  filter(!is.na(`Life expectancy`)& !is.na(`Total expenditure`)& Year == 2014) %>%
+  select(Country, Year, Status, `Life expectancy`, `Total expenditure`)
+
+```
+
+## Exploratory Data Analysis
+
+## Numerical Summary
+
+
+```{r}
+## units (age)
+summary(data_clean$`Life expectancy`)
+```
+```{r}
+## units (%)
+summary(data_clean$`Total expenditure`)
+```
+
+## Graphical summary
+
+```{r}
+## Create a side-by-side boxplot to check the expenditure of developing and developed countries
+ggplot(data = data_clean, aes(x = Status, y = `Total expenditure`)) +
+  geom_boxplot(fill = "steelblue", color = "black") +
+  labs(x = 'Country Status (Developed or Developing)', 
+       y = 'Expenditure on health of total government expenditure(%)',
+       title = "Box plot of total expenditure for developing and developed countries")
+
+```
+
+```{r}
+## Create a histogram to see the distribution of life expectancy
+ggplot(data = data_clean, aes(x = `Life expectancy`)) +
+  geom_histogram(fill = 'steelblue', color = 'black', bins = 15) +
+  labs(x = 'Life Expectancy (age)', title = 'Histogram of life expectancy for 145 countries')
+```
+\newpage
+
+## Goodness of fit test for Totoal Expenditure
+```{r}
+# Set the sample mean and standard deviation for Total Expenditure
+mean_Exp <- mean(data_clean$`Total expenditure`)
+sd_Exp <- sd(data_clean$`Total expenditure`)
+
+# Standardized the data of Total expenditure
+Exp_std <- (data_clean$`Total expenditure` - mean_Exp) / sd_Exp
+
+# Create 5 equal-probability interval
+prob <- c(0:5) * 1/5
+qnorm(prob)
+
+# The number of standardized Total expenditure in each interval above
+I_1 <- sum(Exp_std <= -0.8416212)
+I_2 <- sum(Exp_std > -0.8416212 & Exp_std <= -0.2533471)
+I_3 <- sum(Exp_std > -0.2533471 & Exp_std <= 0.2533471)
+I_4 <- sum(Exp_std > 0.2533471 & Exp_std <= 0.8416212)
+I_5 <- sum(Exp_std > 0.8416212)
+
+# Actual counts
+actual_count <- c(I_1, I_2, I_3, I_4, I_5)
+
+# Expected counts
+n_row <- nrow(data_clean)
+expected <- n_row * 1/5
+expected_count <- rep(expected, 5)
+
+# Test statistic
+Q <- sum((actual_count - expected_count)^2 / expected_count)
+
+# Calculate P_value
+1 - pchisq(Q, df=4)
+```
+\newpage
+## Confidence Interval
+
+CI : $\bar{X}\pm t*\frac{S}{\sqrt{n}}$
+```{r}
+# Set the sample mean and standard deviation for Total Expenditure
+mean_Exp <- mean(data_clean$`Total expenditure`)
+sd_Exp <- sd(data_clean$`Total expenditure`)
+
+# Sample size
+n <- nrow(data_clean)
+
+# Critical value, here we want to build a 98% confidence interval
+t <- qt(c(0.01, 0.99), df = n -1)
+
+# Confidence interval
+mean_Exp + t*sd_Exp/sqrt(n)
+
+## Next we divide the dataset data_clean into two groups.
+
+## The first group is all the data whose Total expenditure are lower than 5.569936
+group_1 <- data_clean %>%
+  filter(`Total expenditure` <= 5.722427) %>%
+  select(`Life expectancy`)
+summary(group_1)
+## The second group is all the data whose Total expenditure are higher than 6.573926
+group_2 <- data_clean %>%
+  filter(`Total expenditure` >= 6.679562) %>%
+  select(`Life expectancy`)
+summary(group_2)
+```
+\newpage
+## Two group hypothesis test
+
+test-stats = $\frac{\bar{x_1} - \bar{x_2}}{\sqrt{\frac{(s_1)^2}{n_1} + \frac{(s_2)^2}{n_2}}}$
+
+df = $\frac{(\frac{s_1^2}{n_1} + \frac{s_2^2}{n_2})^2}{\frac{(\frac{s_1^2}{n_1})^2}{n_1-1} + \frac{(\frac{s_2^2}{n_2})^2}{n_2-1}}$
+
+```{r}
+# Create a dataset that only contain developed country
+developed <- data_clean %>%
+  filter(Status == "Developed")
+
+# Create a dataset that only contain developed country
+developing <- data_clean %>%
+  filter(Status == "Developing")
+
+# Set the mean of Total expenditure for each group
+mean_developed <- mean(developed$`Total expenditure`)
+mean_developing <- mean(developing$`Total expenditure`)
+
+# Set the standard deviation of total expenditure for each group
+sd_developed <- sd(developed$`Total expenditure`)
+sd_developing <- sd(developing$`Total expenditure`)
+
+# Set the sample size for each group
+n_developed <- nrow(developed)
+n_developing <- nrow(developing)
+
+# Test statistic
+test_stats <- (mean_developed - mean_developing)/sqrt(sd_developed^2/n_developed 
++ sd_developing^2/n_developing)
+
+# Degrees of freedom
+df <- floor((sd_developed^2/n_developed + sd_developing^2/n_developing)^2/
+(((sd_developed^2)/n_developed)^2/(n_developed-1)
++ ((sd_developing^2)/n_developing)^2/(n_developing - 1)))
+
+# P-value
+1-pt(test_stats, df=df)
+
+summary(developed)
+summary(developing)
+```
+\newpage
+
+## SLR
+## (1) Plot
+
+```{r}
+# Create a scatter plot to analyze the relationship between Life expectancy and Total expenditure
+ggplot(data = data_clean, aes(x = `Life expectancy`, y = `Total expenditure`)) +
+  geom_point()+
+  labs(x = 'Life expectancy(age)',
+       y = 'Expenditure on health of total government expenditure(%)',
+       title = 'Relations between Total expenditure and life expectancy')
+```
+\newpage
+
+## Fitted regression line equation
+```{r}
+model <- lm(`Life expectancy` ~ `Total expenditure` , data = data_clean)
+summary(model)
+```
+
+regression line equation: $\hat{y_i} = 69.5846  + 0.9845x_i$
+$R^2 = 0.08901$ 
+
+## Hypothesis test for $\beta{_1}$
+$H_0: \beta{_1} = 0$
+$H_a: \beta{_1} \neq 0$
+
+
+## Confidence interval for $\beta{_0}$ and $\beta{_1}$
+```{r}
+# Set the degrees of freedom
+df <- model$df.residual
+
+# Set the critical value
+t <- qt(c(0.01,0.99), df=df)
+
+# 98% CI for $\beta{_0}$
+-60208.5 + t*10950.4
+
+# 98% CI for $\beta{_1}$
+981.5 + t* 151.8
+```
+
